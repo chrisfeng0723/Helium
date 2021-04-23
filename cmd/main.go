@@ -12,12 +12,13 @@ import (
 	"github.com/spf13/cast"
 	"io/ioutil"
 	"regexp"
+	"sort"
 	"strings"
 )
 
 type Result struct {
 	Number int
-	HF     float64
+	HF     string
 }
 
 func main() {
@@ -30,10 +31,27 @@ func main() {
 	for _, file := range files {
 		go Worker(file.Name(), ResultChan)
 	}
+	var results Results
 	for i := 0; i < len(files); i++ {
-		temp := <-ResultChan
-		fmt.Println(temp)
+		results = append(results,<-ResultChan)
 	}
+	//找出最后两位不同的内容
+	resultMap := make(map[string]int,0)
+	for _,val := range results{
+		tempHF:=val.HF
+		temp :=tempHF[0:len(tempHF)-2]
+		resultMap[temp] = val.Number
+	}
+	//转成results数组
+	filterResult :=make(Results,0)
+	for key,val :=range resultMap{
+		filterResult = append(filterResult,Result{
+			Number: val,
+			HF:     key,
+		})
+	}
+	sort.Sort(results)
+	fmt.Println(results)
 }
 
 func Worker(fileName string, ResultChan chan Result) {
@@ -42,7 +60,7 @@ func Worker(fileName string, ResultChan chan Result) {
 	var result Result
 	result.Number = cast.ToInt(fileNumber)
 	hf := GetFileHF(fileName)
-	result.HF = cast.ToFloat64(hf)
+	result.HF =hf
 	ResultChan <- result
 
 }
@@ -65,24 +83,13 @@ func GetFileHF(fileName string) string {
 	if len(params) > 0 {
 		return params[1]
 	}
-	/**
-	buf := bufio.NewReader(file)
-	for {
-		line, err := buf.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				break
-			} else {
-				fmt.Println(fileName+"Read file error!", err)
-				return ""
-			}
-		}
-		params :=Regexp.FindStringSubmatch(line)
-		if len(params) >0{
-			return params[1]
-		}
-	}
-
-	*/
 	return ""
 }
+
+type Results []Result
+//排序方法
+func(r Results) Len() int{ return len(r)}
+func(r Results) Less(i,j int) bool{
+	return r[i].HF >r[j].HF
+}
+func(r Results) Swap(i,j int){r[i],r[j] = r[j],r[i]}
