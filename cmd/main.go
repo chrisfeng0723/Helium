@@ -14,11 +14,15 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"github.com/360EntSecGroup-Skylar/excelize/v2"
+	"time"
 )
 
 type Result struct {
 	Number int
 	HF     string
+	HFF    float64
+	HFCut  float64
 }
 
 func main() {
@@ -35,23 +39,9 @@ func main() {
 	for i := 0; i < len(files); i++ {
 		results = append(results,<-ResultChan)
 	}
-	//找出最后两位不同的内容
-	resultMap := make(map[string]int,0)
-	for _,val := range results{
-		tempHF:=val.HF
-		temp :=tempHF[0:len(tempHF)-2]
-		resultMap[temp] = val.Number
-	}
-	//转成results数组
-	filterResult :=make(Results,0)
-	for key,val :=range resultMap{
-		filterResult = append(filterResult,Result{
-			Number: val,
-			HF:     key,
-		})
-	}
 	sort.Sort(results)
-	fmt.Println(results)
+	//fmt.Println(results)
+	WriteExcel(results)
 }
 
 func Worker(fileName string, ResultChan chan Result) {
@@ -61,6 +51,8 @@ func Worker(fileName string, ResultChan chan Result) {
 	result.Number = cast.ToInt(fileNumber)
 	hf := GetFileHF(fileName)
 	result.HF =hf
+	result.HFCut= cast.ToFloat64(hf[0:len(hf)-2])
+	result.HFF = cast.ToFloat64(hf)
 	ResultChan <- result
 
 }
@@ -84,6 +76,26 @@ func GetFileHF(fileName string) string {
 		return params[1]
 	}
 	return ""
+}
+
+
+func WriteExcel(Content []Result){
+	f := excelize.NewFile()
+	// Create a new sheet.
+	index := f.NewSheet("Sheet1")
+	// Set value of a cell.
+	for key,val := range Content{
+		f.SetCellValue("Sheet1", "A"+cast.ToString(key), val.Number)
+		f.SetCellValue("Sheet1", "B"+cast.ToString(key), val.HF)
+	}
+
+	f.SetActiveSheet(index)
+	// Save spreadsheet by the given path.
+	fileName := time.Now().Format("20060102150405")+".xlsx"
+	if err := f.SaveAs(fileName); err != nil {
+		fmt.Println(err)
+	}
+
 }
 
 type Results []Result
