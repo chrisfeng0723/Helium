@@ -15,9 +15,9 @@ import (
 	"os"
 	"regexp"
 	"sort"
-	"strings"
 	"github.com/360EntSecGroup-Skylar/excelize/v2"
 	"github.com/shopspring/decimal"
+	"sync"
 	"time"
 )
 
@@ -36,13 +36,17 @@ func main() {
 		fmt.Println(err)
 	}
 	ResultChan := make(chan Result, len(files))
+	wg := &sync.WaitGroup{}
 	for _, file := range files {
-		go Worker(file.Name(), ResultChan)
+		wg.Add(1)
+		go Worker(wg,file.Name(), ResultChan)
 	}
 	var results Results
-	for i := 0; i < len(files); i++ {
-		results = append(results,<-ResultChan)
+	go monitorWorker(wg,ResultChan)
+	for task := range ResultChan {
+		results = append(results,task)
 	}
+
 	sort.Sort(results)
 	//fmt.Println(results)
 	WriteExcel(results)
@@ -67,24 +71,38 @@ func main() {
 	}
 }
 
-func Worker(fileName string, ResultChan chan Result) {
+func monitorWorker(wg *sync.WaitGroup, cs chan Result) {
+	wg.Wait()
+	close(cs)
+}
 
+func Worker(wg *sync.WaitGroup,fileName string, ResultChan chan Result) {
+	defer wg.Done()
 	fileNumber := GetFileNumber(fileName)
 	var result Result
-	result.Number = cast.ToInt(fileNumber)
 	hf := GetFileHF(fileName)
-	result.HF =hf
-	result.HFCut= cast.ToFloat64(hf[0:len(hf)-2])
-	result.HFF = cast.ToFloat64(hf)
-	result.File = fileName
-	ResultChan <- result
+
+	if len(hf) > 0{
+		result.Number = cast.ToInt(fileNumber)
+		result.HF =hf
+		result.HFCut= cast.ToFloat64(hf[0:len(hf)-2])
+		result.HFF = cast.ToFloat64(hf)
+		result.File = fileName
+		ResultChan <- result
+	}
 
 }
 
 func GetFileNumber(fileName string) string {
-	temp1 := strings.Split(fileName, ".")
-	temp2 := strings.Split(temp1[0], "-")
-	return temp2[1]
+	//temp1 := strings.Split(fileName, ".")
+	//temp2 := strings.Split(temp1[0], "-")
+	str :=`[-|_]0*([1-9][0-9]*)\.`
+	Regexp :=regexp.MustCompile(str)
+	params :=Regexp.FindStringSubmatch(fileName)
+	//for _,param :=range params {
+	//	fmt.Println(param)
+	//}
+	return params[1]
 }
 
 func GetFileHF(fileName string) string {
