@@ -48,35 +48,42 @@ func main() {
 	var results Results
 	verifyMap := make(map[string]int, 0)
 	go monitorWorker(wg, ResultChan)
-	//所有数据入库，如果hfcut有重复的，则不入
 	for task := range ResultChan {
-		if _, ok := verifyMap[task.HFCut]; !ok {
+		//if _, ok := verifyMap[task.HFCut]; !ok {
 			results = append(results, task)
-			verifyMap[task.HFCut] = 1
-		}
+			//verifyMap[task.HFCut] = 1
+		//}
 	}
-	fmt.Println(results)
+	//fmt.Println(results)
 	sort.Sort(results)
 	//fmt.Println(results)
 	WriteExcel(results)
 	//计算结果超过25
 	folderName := "ti" + time.Now().Format("20060102150405")
 	CreateFolder(folderName)
-	for key, val := range results {
-		var c float64
+	for _, val := range results {
+		//var c float64
 		var tempVal decimal.Decimal
+		/**
 		if key == 0 {
 			c = 0
 		} else {
 			tempVal = decimal.NewFromFloat(val.HFF).Sub(decimal.NewFromFloat(results[0].HFF))
 			c, _ = tempVal.Float64()
 		}
+
+		 */
+		tempVal = decimal.NewFromFloat(val.HFF).Sub(decimal.NewFromFloat(results[0].HFF))
 		d := tempVal.Mul(decimal.NewFromFloat(627.5))
-		fmt.Println(val.Number, val.HF, c, d)
-		if ok := d.LessThanOrEqual(decimal.NewFromFloat(2.5)); ok {
+		//fmt.Println(val.Number, val.HF, c, d)
+		_, eok := verifyMap[val.HFCut]
+		dok :=d.LessThanOrEqual(decimal.NewFromFloat(2.5))
+		if  dok && !eok {
 			fmt.Println(val.File)
 			CopyFile(folderName+"/"+val.File, PATH+"/"+val.File)
 		}
+
+		verifyMap[val.HFCut] = 1
 	}
 }
 
@@ -152,6 +159,7 @@ func WriteExcel(Content []Result) {
 			f.SetCellFormula("Sheet1", "C"+cast.ToString(key+1), value.String())
 		}
 		f.SetCellFormula("Sheet1", "D"+cast.ToString(key+1), "C"+cast.ToString(key+1)+"*627.5")
+		f.SetCellValue("Sheet1", "E"+cast.ToString(key+1), val.HFCut)
 
 	}
 
